@@ -78,9 +78,11 @@
 //=== Local variables ==============================================================================
 
 uint16  DemoCount;
-uint8	DemoView;
+char	FunctionView;
 char	TempString[32];
+
 uint16	DemoMem[256];
+uint16	CpuUsageMem[3][128];
 
 //=== Local function prototypes ====================================================================
 
@@ -165,6 +167,61 @@ void LogCpuTemperature(void)
 	DemoMem[0] = temp;
 }	
 
+void LogCpuUsage(void)
+{
+	uint16 i;
+	int AvgType;
+	double loadavg[3];
+	getloadavg(loadavg,3);
+	
+	for(AvgType = 0; AvgType < 3; AvgType++) {
+		for(i=126;i>0;i--) { 
+			CpuUsageMem[AvgType][i+1] = CpuUsageMem[AvgType][i];
+		}
+		CpuUsageMem[AvgType][1] = CpuUsageMem[AvgType][0];
+		CpuUsageMem[AvgType][0] = loadavg[AvgType]*100;
+		if (CpuUsageMem[AvgType][0] > 100) {
+			CpuUsageMem[AvgType][0] = 100;
+		}
+	}
+}	
+
+void CpuUssage(int AvgType)
+{
+	uint16	x,y,oldY=0;
+	char	OutputString[32];
+	char	AvgString[10];
+	const int MAX_Y = 60;
+	const int MIN_Y = 3;
+	const int MAX_X = 128;
+	const int MIN_X = 21;	
+	LCD_ClearScreen();
+	LCD_SetPenColor(1);
+	LCD_SetFont(0);
+	if(AvgType == 0) { strncpy(AvgString,"1m avg",10); }
+	else if (AvgType == 1) { strncpy(AvgString,"5m avg",10); }
+	else if (AvgType == 2) { strncpy(AvgString,"15m avg",10); }
+	else { printf("invalid AvgType\n");
+	   exit(1); 
+   }
+	snprintf(OutputString,32,"CPU %s:%d%%\n",AvgString, CpuUsageMem[AvgType][0]);
+	LCD_PrintXY(30,0,OutputString);
+		
+	LCD_PrintXY(0,0, "100-");
+	LCD_PrintXY(0,MAX_Y/2,"50 -");
+	LCD_PrintXY(0,MAX_Y-3,"0  -");
+	LCD_DrawLine(MIN_X,0,MIN_X,63);
+	for(x=MAX_X;x>MIN_X;x--)
+	{
+		//start drawing from the right side MAX_X-x
+		//convert the percentage to the drawing area (MAX_Y-MIN_Y)/100*CpuUsageMem
+		y = (float)(MAX_Y-MIN_Y)/100*CpuUsageMem[AvgType][MAX_X-x];
+		//invert as 0 is top of the display
+		y = MAX_Y-y;
+		LCD_DrawLine(x,y,x+1,oldY);
+		oldY=y;
+	}
+}
 void DemoCpuTemperature(void)
 {
 	uint16	i,y;
@@ -301,10 +358,8 @@ int main(int argc, char **argv)
 	LCD_Init();			// Init Display
 	SetBacklight(1);	// Turn Backlight on
 	
-	DemoView = 0;
 	DemoCpuTemperatureInit();
-	DemoBubblesInit();
-		
+	FunctionView = 0;
 	while(1)
 	{
 		DemoCount++;
@@ -313,7 +368,10 @@ int main(int argc, char **argv)
 		
 		if(Button) printf("Buttons: %02X (%02X) Contrast=%i Backlight=%u\r\n",Button,ButtonPressed,Contrast,Backlight);
 
-		if((DemoCount & 3) == 0) LogCpuTemperature();			
+		if((DemoCount & 3) == 0) {
+			LogCpuTemperature();
+			LogCpuUsage();
+		}			
 			
 		if(BUTTON_PRESSED_UP || BUTTON_PRESSED_DOWN)
 		{
@@ -326,16 +384,18 @@ int main(int argc, char **argv)
 			Backlight = (Backlight) ? 0 : 1;	// Toggle Backlight
 			SetBacklight(Backlight);			// Write to Hardware
 		}		
-		if(BUTTON_PRESSED_A  && DemoView) DemoView--;		
-		if(BUTTON_PRESSED_B && (DemoView < 6)) DemoView++;		
+		
+		if(BUTTON_PRESSED_A) { FunctionView--; }		
+		if(BUTTON_PRESSED_B) {FunctionView++; }
+		if (FunctionView >  5) { FunctionView = 0; }
+		if (FunctionView <  0) { FunctionView = 5; }
 	
-		if(     DemoView == 0)	 DemoLogo();
-		else if(DemoView == 1)	 { if((DemoCount & 3) == 0) DemoCpuTemperature(); }
-		else if(DemoView == 2)  DemoBitmap();
-		else if(DemoView == 3)  DemoFont();
-		else if(DemoView == 4)	 DemoVector();
-		else if(DemoView == 5)	 DemoBubbles();
-		else if(DemoView == 6)	 DemoText();
+		if(     FunctionView == 0)	 { DemoLogo(); }
+		else if(FunctionView == 1)	 { if((DemoCount & 3) == 0) DemoCpuTemperature(); }
+		else if(FunctionView == 2)  { if((DemoCount & 3) == 0) CpuUssage(0); }
+		else if(FunctionView == 3)  { if((DemoCount & 3) == 0) CpuUssage(1); }
+		else if(FunctionView == 4)	 { if((DemoCount & 3) == 0) CpuUssage(2); }
+		 
 					
 		LCD_WriteFramebuffer();
 		
@@ -345,7 +405,7 @@ int main(int argc, char **argv)
 			printf("\r\nINIT !!!\r\n\r\n");
 			LCD_Init();			// Init Display
 			SetBacklight(1);	// Turn Backlight on
-			DemoView = 0;
+			FunctionView = 0;
 		}		
 	}
 	return(0);
