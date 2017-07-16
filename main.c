@@ -330,7 +330,7 @@ int main(int argc, char **argv)
 	SetBacklight(1);	// Turn Backlight on
 	
 	DemoCpuTemperatureInit();
-	FunctionView = 0;
+	FunctionView = 1;
 	while(1)
 	{
 		UpdateButtons();
@@ -351,13 +351,13 @@ int main(int argc, char **argv)
 		
 		if(BUTTON_PRESSED_A) { FunctionView--; }		
 		if(BUTTON_PRESSED_B) {FunctionView++; }
-		if (FunctionView >  5) { FunctionView = 0; }
-		if (FunctionView <  0) { FunctionView = 5; }
-		if(     FunctionView == 0)	 { DemoLogo(); }
-		else if(FunctionView == 1)	 { DemoCpuTemperature(); }
-		else if(FunctionView == 2)  { CpuUssage(0); }
-		else if(FunctionView == 3)  { CpuUssage(1); }
-		else if(FunctionView == 4)	 { CpuUssage(2); }
+		if (FunctionView >  5) { FunctionView = 1; }
+		if (FunctionView <  1) { FunctionView = 5; }
+		if(     FunctionView == 1)	 { DemoLogo(); }
+		else if(FunctionView == 2)	 { DemoCpuTemperature(); }
+		else if(FunctionView == 3)  { CpuUssage(0); }
+		else if(FunctionView == 4)  { CpuUssage(1); }
+		else if(FunctionView == 5)	 { CpuUssage(2); }
 		LCD_WriteFramebuffer();	
 	
 		if(timeWaited >= MS_BETWEEN_DATA_REFRESH) {
