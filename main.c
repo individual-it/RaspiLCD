@@ -77,12 +77,14 @@
 
 //=== Local variables ==============================================================================
 
-uint16  DemoCount;
 char	FunctionView;
 char	TempString[32];
 
 uint16	DemoMem[256];
 uint16	CpuUsageMem[3][128];
+
+const uint MS_BETWEEN_BUTTON_POOLS = 50;
+const uint MS_BETWEEN_DATA_REFRESH = 1000;
 
 //=== Local function prototypes ====================================================================
 
@@ -316,7 +318,7 @@ void DemoBitmap(void)
 int main(int argc, char **argv)
 { 
 	int Contrast,Backlight;
-
+	uint timeWaited = 0;
 	Contrast = 9;
 	Backlight = 1;
 			
@@ -331,16 +333,9 @@ int main(int argc, char **argv)
 	FunctionView = 0;
 	while(1)
 	{
-		DemoCount++;
-		SleepMs(50);
 		UpdateButtons();
 		
 		if(Button) printf("Buttons: %02X (%02X) Contrast=%i Backlight=%u\r\n",Button,ButtonPressed,Contrast,Backlight);
-
-		if((DemoCount & 3) == 0) {
-			LogCpuTemperature();
-			LogCpuUsage();
-		}			
 			
 		if(BUTTON_PRESSED_UP || BUTTON_PRESSED_DOWN)
 		{
@@ -358,15 +353,20 @@ int main(int argc, char **argv)
 		if(BUTTON_PRESSED_B) {FunctionView++; }
 		if (FunctionView >  5) { FunctionView = 0; }
 		if (FunctionView <  0) { FunctionView = 5; }
-	
 		if(     FunctionView == 0)	 { DemoLogo(); }
-		else if(FunctionView == 1)	 { if((DemoCount & 3) == 0) DemoCpuTemperature(); }
-		else if(FunctionView == 2)  { if((DemoCount & 3) == 0) CpuUssage(0); }
-		else if(FunctionView == 3)  { if((DemoCount & 3) == 0) CpuUssage(1); }
-		else if(FunctionView == 4)	 { if((DemoCount & 3) == 0) CpuUssage(2); }
-		 
-					
-		LCD_WriteFramebuffer();
+		else if(FunctionView == 1)	 { DemoCpuTemperature(); }
+		else if(FunctionView == 2)  { CpuUssage(0); }
+		else if(FunctionView == 3)  { CpuUssage(1); }
+		else if(FunctionView == 4)	 { CpuUssage(2); }
+		LCD_WriteFramebuffer();	
+	
+		if(timeWaited >= MS_BETWEEN_DATA_REFRESH) {
+			LogCpuTemperature();
+			LogCpuUsage();
+			timeWaited=0;
+		}
+		timeWaited = timeWaited + MS_BETWEEN_BUTTON_POOLS;
+		SleepMs(MS_BETWEEN_BUTTON_POOLS);	
 	}
 	return(0);
 }
