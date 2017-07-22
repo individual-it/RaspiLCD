@@ -24,13 +24,13 @@
 // You should have received a copy of the GNU General Public License along with this program.  
 // If not, see <http://www.gnu.org/licenses/>.
 //
-// Dieses Programm ist Freie Software: Sie können es unter den Bedingungen der GNU General Public
+// Dieses Programm ist Freie Software: Sie kÃ¶nnen es unter den Bedingungen der GNU General Public
 // License, wie von der Free Software Foundation, Version 3 der Lizenz oder (nach Ihrer Option) 
-// jeder späteren veröffentlichten Version, weiterverbreiten und/oder modifizieren.
+// jeder spÃ¤teren verÃ¶ffentlichten Version, weiterverbreiten und/oder modifizieren.
 //
-// Dieses Programm wird in der Hoffnung, dass es nützlich sein wird, aber OHNE JEDE GEWÄHRLEISTUNG,
-// bereitgestellt; sogar ohne die implizite Gewährleistung der MARKTFÄHIGKEIT oder EIGNUNG FÜR 
-// EINEN BESTIMMTEN ZWECK. Siehe die GNU General Public License für weitere Details.
+// Dieses Programm wird in der Hoffnung, dass es nÃ¼tzlich sein wird, aber OHNE JEDE GEWÃ„HRLEISTUNG,
+// bereitgestellt; sogar ohne die implizite GewÃ¤hrleistung der MARKTFÃ„HIGKEIT oder EIGNUNG FÃœR 
+// EINEN BESTIMMTEN ZWECK. Siehe die GNU General Public License fÃ¼r weitere Details.
 //
 // Sie sollten eine Kopie der GNU General Public License zusammen mit diesem Programm erhalten 
 // haben. Wenn nicht, siehe <http://www.gnu.org/licenses/>.
@@ -57,10 +57,12 @@
 #include <sys/time.h>
 #include <termios.h>
 #include <stdio.h>
+#include <time.h>
 #include "std_c.h"
 #include "bcm2835.h"
 #include "raspilcd.h"
 #include "lcd.h"
+
 
 //=== Preprocessing directives (#define) ===========================================================
 
@@ -85,6 +87,9 @@ uint16	CpuUsageMem[3][128];
 
 const uint MS_BETWEEN_BUTTON_POOLS = 50;
 const uint MS_BETWEEN_DATA_REFRESH = 1000;
+
+const char *timeZones[3] = {NULL, "CET", "UTC"};
+
 
 //=== Local function prototypes ====================================================================
 
@@ -158,10 +163,10 @@ void LogCpuTemperature(void)
 	temp = 0;
 	if(TempString[0])
 	{
-		TempString[3]=0;	// end at 1/10 °C
+		TempString[3]=0;	// end at 1/10 Â°C
 		sscanf(TempString,"%u",&temp);
 		printf("%u\r\n",temp);
-		TempString[3]=TempString[2]; TempString[2]='.'; TempString[4]='°'; TempString[5]='C'; TempString[6]=0;
+		TempString[3]=TempString[2]; TempString[2]='.'; TempString[4]='Â°'; TempString[5]='C'; TempString[6]=0;
 	}
 	
 	for(i=126;i>0;i--)  DemoMem[i+1] = DemoMem[i];
@@ -309,7 +314,45 @@ void DemoBitmap(void)
 	LCD_DrawBitmap(0,0,bmp_men);	
 	LCD_SetFont(1);		LCD_PrintXY(6,0, "Bitmap");
 }
- 
+
+void TimeDate(char timezone[20]) {
+	char outstr[200];
+	time_t t;
+	struct tm *localTime;
+	LCD_ClearScreen();
+	t = time(NULL);
+	if (timezone == NULL) {
+		unsetenv("TZ");
+		tzset();
+	}
+	else {
+		setenv("TZ", timezone, 1);
+		tzset();
+	}
+	localTime = localtime(&t);
+	if (localTime == NULL) {
+		perror("localtime");
+		exit(EXIT_FAILURE);
+	}
+	strftime(outstr, sizeof(outstr), "%H:%M:%S", localTime);
+	LCD_SetFont(3);
+	LCD_PrintXY(0,0, outstr);
+	
+	strftime(outstr, sizeof(outstr), "%Z", localTime);
+	LCD_SetFont(2);
+	LCD_PrintXY(0,20,"TZ:");
+	LCD_PrintXY(30,20, outstr);
+
+	strftime(outstr, sizeof(outstr), "%a %b %d", localTime);
+	LCD_PrintXY(0,35, outstr);
+	
+	LCD_SetFont(0);
+	LCD_PrintXY(115,55, "TZ");
+	LCD_SetPenColor(1);
+	LCD_DrawLine(112,55,112,63);
+	LCD_DrawLine(109,60,112,63);
+	LCD_DrawLine(115,60,112,63);
+}
 //--------------------------------------------------------------------------------------------------
 //--------------------------------------------------------------------------------------------------
 //--------------------------------------------------------------------------------------------------
@@ -319,6 +362,7 @@ int main(int argc, char **argv)
 { 
 	int Contrast,Backlight;
 	uint timeWaited = 0;
+	uint timeZoneCounter = 0;
 	Contrast = 9;
 	Backlight = 1;
 			
@@ -351,13 +395,22 @@ int main(int argc, char **argv)
 		
 		if(BUTTON_PRESSED_A) { FunctionView--; }		
 		if(BUTTON_PRESSED_B) {FunctionView++; }
-		if (FunctionView >  5) { FunctionView = 1; }
-		if (FunctionView <  1) { FunctionView = 5; }
+		if (FunctionView >  6) { FunctionView = 1; }
+		if (FunctionView <  1) { FunctionView = 6; }
 		if(     FunctionView == 1)	 { DemoLogo(); }
 		else if(FunctionView == 2)	 { DemoCpuTemperature(); }
 		else if(FunctionView == 3)  { CpuUssage(0); }
 		else if(FunctionView == 4)  { CpuUssage(1); }
 		else if(FunctionView == 5)	 { CpuUssage(2); }
+		else if(FunctionView == 6)	 { 
+			if (BUTTON_PRESSED_C) {
+				timeZoneCounter++;
+				if (timeZoneCounter >= sizeof(timeZones)/sizeof(timeZones[0])) {
+					timeZoneCounter = 0;
+				}
+			}
+			TimeDate(timeZones[timeZoneCounter]);
+		}
 		LCD_WriteFramebuffer();	
 	
 		if(timeWaited >= MS_BETWEEN_DATA_REFRESH) {
